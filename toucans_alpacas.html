@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beak & Wool: Tactical Tussle</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #2d5016;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .game-container {
+            display: flex;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        .top-bar {
+            background: linear-gradient(90deg, #1a472a, #4a7c59);
+            padding: 10px 20px;
+            border-bottom: 2px solid #666;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .faction-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .faction-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+        }
+
+        .toucan-color { background: #ff6b35; }
+        .alpaca-color { background: #8b4513; }
+
+        .turn-info {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+        }
+
+        .game-board {
+            flex: 1;
+            position: relative;
+            background: #4a7c59;
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 64px);
+            grid-template-rows: repeat(8, 64px);
+            gap: 1px;
+            padding: 20px;
+            background: #333;
+        }
+
+        .tile {
+            width: 64px;
+            height: 64px;
+            position: relative;
+            cursor: pointer;
+            border: 2px solid transparent;
+            image-rendering: pixelated;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .tile.grass {
+            background: linear-gradient(135deg, #4a7c59, #5a8c69);
+        }
+
+        .tile.forest {
+            background: linear-gradient(135deg, #2d5016, #3d6026);
+        }
+
+        .tile.mountain {
+            background: linear-gradient(135deg, #8b7355, #9b8365);
+        }
+
+        .tile.water {
+            background: linear-gradient(135deg, #4682b4, #5792c4);
+        }
+
+        .tile.village {
+            background: linear-gradient(135deg, #d2b48c, #e2c49c);
+        }
+
+        .tile.selected {
+            border-color: #ffff00;
+            box-shadow: 0 0 10px #ffff00;
+        }
+
+        .tile.movable {
+            border-color: #00ff00;
+            background: rgba(0, 255, 0, 0.2);
+        }
+
+        .tile.attackable {
+            border-color: #ff0000;
+            background: rgba(255, 0, 0, 0.3);
+        }
+
+        .unit {
+            position: absolute;
+            width: 48px;
+            height: 48px;
+            top: 8px;
+            left: 8px;
+            image-rendering: pixelated;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            z-index: 10;
+        }
+
+        .unit.toucan {
+            filter: hue-rotate(0deg);
+        }
+
+        .unit.alpaca {
+            filter: hue-rotate(30deg);
+        }
+
+        .unit.moved {
+            opacity: 0.6;
+        }
+
+        .hp-bar {
+            position: absolute;
+            bottom: -2px;
+            left: 4px;
+            width: 40px;
+            height: 4px;
+            background: #333;
+            border: 1px solid #000;
+            z-index: 15;
+        }
+
+        .hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00);
+            transition: width 0.3s ease;
+        }
+
+        .side-panel {
+            width: 300px;
+            background: linear-gradient(180deg, #1a472a, #2d5016);
+            border-left: 2px solid #666;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .unit-info {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .unit-portrait {
+            width: 64px;
+            height: 64px;
+            background: #666;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            image-rendering: pixelated;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .unit-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 12px;
+        }
+
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #4a7c59, #5a8c69);
+            border: 2px solid #666;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: linear-gradient(135deg, #5a8c69, #6a9c79);
+            border-color: #888;
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .end-turn-btn {
+            background: linear-gradient(135deg, #8b4513, #9b5523);
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .log {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            padding: 10px;
+            height: 120px;
+            overflow-y: auto;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .terrain-icons {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            top: 2px;
+            right: 2px;
+            font-size: 12px;
+            z-index: 5;
+        }
+
+        @keyframes attack-flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .attacking {
+            animation: attack-flash 0.5s ease-in-out;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a472a, #2d5016);
+            border: 3px solid #666;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .modal h2 {
+            color: #ffff00;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .modal button {
+            background: linear-gradient(135deg, #4a7c59, #5a8c69);
+            border: 2px solid #666;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="top-bar">
+            <div class="faction-info">
+                <div class="faction-icon toucan-color"></div>
+                <span>Toucans</span>
+                <span style="margin: 0 20px;">⚔</span>
+                <div class="faction-icon alpaca-color"></div>
+                <span>Alpacas</span>
+            </div>
+            <div class="turn-info">
+                Turn: <span id="turn-counter">1</span> | 
+                Current: <span id="current-faction">Toucans</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="game-board">
+                <div class="board-grid" id="game-board"></div>
+            </div>
+
+            <div class="side-panel">
+                <div class="unit-info" id="unit-info">
+                    <h3>Select a unit</h3>
+                    <div class="unit-portrait" id="unit-portrait"></div>
+                    <div class="unit-stats" id="unit-stats"></div>
+                    <div class="actions" id="unit-actions"></div>
+                </div>
+
+                <button class="action-btn end-turn-btn" onclick="endTurn()">End Turn</button>
+
+                <div class="log" id="game-log">
+                    <div class="log-entry">Game started! Toucans turn.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        let currentPlayer = 'toucan';
+        let turnCount = 1;
+        let selectedUnit = null;
+        let gameBoard = [];
+        let units = [];
+        let gameMode = 'select'; // select, move, attack
+
+        // Unit Types and Stats
+        const unitTypes = {
+            // Toucan units
+            'toucan-scout': {
+                name: 'Scout',
+                faction: 'toucan',
+                hp: 8,
+                maxHp: 8,
+                movement: 6,
+                attackRange: 1,
+                attackPower: 4,
+                defense: 2,
+                special: 'Sky Glide',
+                sprite: '🦜'
+            },
+            'toucan-archer': {
+                name: 'Archer',
+                faction: 'toucan',
+                hp: 8,
+                maxHp: 8,
+                movement: 4,
+                attackRange: 3,
+                attackPower: 5,
+                defense: 3,
+                special: 'Perch Shot',
+                sprite: '🏹'
+            },
+            'toucan-bomber': {
+                name: 'Dive Bomber',
+                faction: 'toucan',
+                hp: 10,
+                maxHp: 10,
+                movement: 5,
+                attackRange: 1,
+                attackPower: 6,
+                defense: 2,
+                special: 'Swoop Strike',
+                sprite: '💥'
+            },
+            // Alpaca units
+            'alpaca-infantry': {
+                name: 'Infantry',
+                faction: 'alpaca',
+                hp: 10,
+                maxHp: 10,
+                movement: 4,
+                attackRange: 1,
+                attackPower: 4,
+                defense: 4,
+                special: 'Wool Shield',
+                sprite: '🦙'
+            },
+            'alpaca-siege': {
+                name: 'Siege Carrier',
+                faction: 'alpaca',
+                hp: 12,
+                maxHp: 12,
+                movement: 3,
+                attackRange: 1,
+                attackPower: 7,
+                defense: 5,
+                special: 'Payload Drop',
+                sprite: '🚛'
+            },
+            'alpaca-shield': {
+                name: 'Shield Bearer',
+                faction: 'alpaca',
+                hp: 14,
+                maxHp: 14,
+                movement: 2,
+                attackRange: 1,
+                attackPower: 3,
+                defense: 7,
+                special: 'Fortify',
+                sprite: '🛡️'
+            }
+        };
+
+        // Terrain types
+        const terrainTypes = {
+            grass: { name: 'Grass', defense: 0, movement: 1 },
+            forest: { name: 'Forest', defense: 1, movement: 2 },
+            mountain: { name: 'Mountain', defense: 2, movement: 3 },
+            water: { name: 'Water', defense: 0, movement: 99 }, // impassable for most units
+            village: { name: 'Village', defense: 1, movement: 1 }
+        };
+
+        // Initialize the game
+        function initGame() {
+            createBoard();
+            initUnits();
+            updateUI();
+            log('Game initialized. Toucans start!');
+        }
+
+        function createBoard() {
+            const board = document.getElementById('game-board');
+            gameBoard = [];
+            
+            // Create 8x8 board with terrain from the image
+            const terrainMap = [
+                ['grass', 'mountain', 'village', 'forest', 'grass', 'forest', 'forest', 'grass'],
+                ['forest', 'forest', 'forest', 'grass', 'mountain', 'forest', 'forest', 'grass'],
+                ['forest', 'forest', 'forest', 'forest', 'water', 'forest', 'grass', 'forest'],
+                ['grass', 'village', 'forest', 'mountain', 'water', 'forest', 'forest', 'forest'],
+                ['grass', 'forest', 'forest', 'forest', 'water', 'village', 'grass', 'grass'],
+                ['village', 'forest', 'forest', 'grass', 'water', 'grass', 'village', 'grass'],
+                ['grass', 'forest', 'village', 'grass', 'water', 'grass', 'village', 'village'],
+                ['grass', 'grass', 'forest', 'forest', 'grass', 'forest', 'grass', 'mountain']
+            ];
+
+            for (let row = 0; row < 8; row++) {
+                gameBoard[row] = [];
+                for (let col = 0; col < 8; col++) {
+                    const tile = document.createElement('div');
+                    const terrain = terrainMap[row][col];
+                    
+                    tile.className = `tile ${terrain}`;
+                    tile.dataset.row = row;
+                    tile.dataset.col = col;
+                    tile.onclick = () => handleTileClick(row, col);
+                    
+                    // Add terrain icon
+                    const terrainIcon = document.createElement('div');
+                    terrainIcon.className = 'terrain-icons';
+                    const icons = {
+                        grass: '🌱',
+                        forest: '🌲',
+                        mountain: '⛰️',
+                        water: '🌊',
+                        village: '🏠'
+                    };
+                    terrainIcon.textContent = icons[terrain];
+                    tile.appendChild(terrainIcon);
+                    
+                    board.appendChild(tile);
+                    gameBoard[row][col] = {
+                        terrain: terrain,
+                        unit: null,
+                        element: tile
+                    };
+                }
+            }
+        }
+
+        function initUnits() {
+            units = [];
+            
+            // Place Toucan units (top side)
+            addUnit('toucan-scout', 0, 1);
+            addUnit('toucan-archer', 0, 3);
+            addUnit('toucan-bomber', 0, 6);
+            addUnit('toucan-scout', 1, 0);
+            addUnit('toucan-archer', 1, 4);
+            
+            // Place Alpaca units (bottom side)
+            addUnit('alpaca-infantry', 7, 1);
+            addUnit('alpaca-siege', 7, 3);
+            addUnit('alpaca-shield', 7, 6);
+            addUnit('alpaca-infantry', 6, 0);
+            addUnit('alpaca-siege', 6, 5);
+        }
+
+        function addUnit(type, row, col) {
+            const unitData = {...unitTypes[type]};
+            unitData.row = row;
+            unitData.col = col;
+            unitData.id = units.length;
+            unitData.hasMoved = false;
+            unitData.hasActed = false;
+            
+            units.push(unitData);
+            gameBoard[row][col].unit = unitData;
+            
+            // Create visual unit element
+            const unitElement = document.createElement('div');
+            unitElement.className = `unit ${unitData.faction}`;
+            unitElement.dataset.unitId = unitData.id;
+            unitElement.innerHTML = unitData.sprite;
+            unitElement.style.fontSize = '24px';
+            
+            // Add HP bar
+            const hpBar = document.createElement('div');
+            hpBar.className = 'hp-bar';
+            const hpFill = document.createElement('div');
+            hpFill.className = 'hp-fill';
+            hpFill.style.width = '100%';
+            hpBar.appendChild(hpFill);
+            unitElement.appendChild(hpBar);
+            
+            gameBoard[row][col].element.appendChild(unitElement);
+        }
+
+        function handleTileClick(row, col) {
+            const tile = gameBoard[row][col];
+            
+            if (gameMode === 'select') {
+                if (tile.unit && tile.unit.faction === currentPlayer && !tile.unit.hasMoved) {
+                    selectUnit(tile.unit);
+                }
+            } else if (gameMode === 'move') {
+                if (canMoveTo(selectedUnit, row, col)) {
+                    moveUnit(selectedUnit, row, col);
+                    clearHighlights();
+                    showUnitActions();
+                }
+            } else if (gameMode === 'attack') {
+                if (tile.unit && tile.unit.faction !== currentPlayer && canAttack(selectedUnit, row, col)) {
+                    attackUnit(selectedUnit, tile.unit);
+                    clearHighlights();
+                    selectedUnit.hasActed = true;
+                    updateUnitDisplay(selectedUnit);
+                    gameMode = 'select';
+                    selectedUnit = null;
+                    updateUnitInfo();
+                }
+            }
+        }
+
+        function selectUnit(unit) {
+            selectedUnit = unit;
+            clearHighlights();
+            highlightTile(unit.row, unit.col, 'selected');
+            updateUnitInfo();
+            showUnitActions();
+        }
+
+        function showUnitActions() {
+            if (!selectedUnit) return;
+            
+            gameMode = 'select';
+            const actions = document.getElementById('unit-actions');
+            actions.innerHTML = '';
+            
+            if (!selectedUnit.hasMoved) {
+                const moveBtn = document.createElement('button');
+                moveBtn.className = 'action-btn';
+                moveBtn.textContent = 'Move';
+                moveBtn.onclick = () => enterMoveMode();
+                actions.appendChild(moveBtn);
+            }
+            
+            if (!selectedUnit.hasActed && selectedUnit.hasMoved) {
+                const attackBtn = document.createElement('button');
+                attackBtn.className = 'action-btn';
+                attackBtn.textContent = 'Attack';
+                attackBtn.onclick = () => enterAttackMode();
+                actions.appendChild(attackBtn);
+                
+                const specialBtn = document.createElement('button');
+                specialBtn.className = 'action-btn';
+                specialBtn.textContent = selectedUnit.special;
+                specialBtn.onclick = () => useSpecialAbility();
+                actions.appendChild(specialBtn);
+            }
+            
+            const waitBtn = document.createElement('button');
+            waitBtn.className = 'action-btn';
+            waitBtn.textContent = 'Wait';
+            waitBtn.onclick = () => {
+                selectedUnit.hasMoved = true;
+                selectedUnit.hasActed = true;
+                updateUnitDisplay(selectedUnit);
+                selectedUnit = null;
+                gameMode = 'select';
+                updateUnitInfo();
+                clearHighlights();
+            };
+            actions.appendChild(waitBtn);
+        }
+
+        function enterMoveMode() {
+            gameMode = 'move';
+            highlightMovableArea(selectedUnit);
+        }
+
+        function enterAttackMode() {
+            gameMode = 'attack';
+            highlightAttackableArea(selectedUnit);
+        }
+
+        function highlightMovableArea(unit) {
+            clearHighlights();
+            highlightTile(unit.row, unit.col, 'selected');
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if (canMoveTo(unit, row, col)) {
+                        highlightTile(row, col, 'movable');
+                    }
+                }
+            }
+        }
+
+        function highlightAttackableArea(unit) {
+            clearHighlights();
+            highlightTile(unit.row, unit.col, 'selected');
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const target = gameBoard[row][col].unit;
+                    if (target && target.faction !== unit.faction && canAttack(unit, row, col)) {
+                        highlightTile(row, col, 'attackable');
+                    }
+                }
+            }
+        }
+
+        function canMoveTo(unit, targetRow, targetCol) {
+            if (targetRow < 0 || targetRow >= 8 || targetCol < 0 || targetCol >= 8) return false;
+            if (gameBoard[targetRow][targetCol].unit) return false;
+            
+            const distance = Math.abs(targetRow - unit.row) + Math.abs(targetCol - unit.col);
+            return distance <= unit.movement;
+        }
+
+        function canAttack(unit, targetRow, targetCol) {
+            const distance = Math.abs(targetRow - unit.row) + Math.abs(targetCol - unit.col);
+            return distance <= unit.attackRange;
+        }
+
+        function moveUnit(unit, newRow, newCol) {
+            // Remove from old position
+            gameBoard[unit.row][unit.col].unit = null;
+            const unitElement = gameBoard[unit.row][unit.col].element.querySelector('.unit');
+            unitElement.remove();
+            
+            // Update unit position
+            unit.row = newRow;
+            unit.col = newCol;
+            unit.hasMoved = true;
+            
+            // Add to new position
+            gameBoard[newRow][newCol].unit = unit;
+            const newUnitElement = document.createElement('div');
+            newUnitElement.className = `unit ${unit.faction} moved`;
+            newUnitElement.dataset.unitId = unit.id;
+            newUnitElement.innerHTML = unit.sprite;
+            newUnitElement.style.fontSize = '24px';
+            
+            // Add HP bar
+            const hpBar = document.createElement('div');
+            hpBar.className = 'hp-bar';
+            const hpFill = document.createElement('div');
+            hpFill.className = 'hp-fill';
+            hpFill.style.width = `${(unit.hp / unit.maxHp) * 100}%`;
+            hpBar.appendChild(hpFill);
+            newUnitElement.appendChild(hpBar);
+            
+            gameBoard[newRow][newCol].element.appendChild(newUnitElement);
+            
+            log(`${unit.name} moved to ${String.fromCharCode(65 + newCol)}${newRow + 1}`);
+        }
+
+        function attackUnit(attacker, target) {
+            const damage = Math.max(1, attacker.attackPower - target.defense + Math.floor(Math.random() * 3) - 1);
+            target.hp = Math.max(0, target.hp - damage);
+            
+            // Visual feedback
+            const targetElement = gameBoard[target.row][target.col].element.querySelector('.unit');
+            targetElement.classList.add('attacking');
+            setTimeout(() => targetElement.classList.remove('attacking'), 500);
+            
+            // Update HP bar
+            const hpFill = targetElement.querySelector('.hp-fill');
+            hpFill.style.width = `${(target.hp / target.maxHp) * 100}%`;
+            
+            log(`${attacker.name} attacks ${target.name} for ${damage} damage!`);
+            
+            if (target.hp <= 0) {
+                // Unit destroyed
+                gameBoard[target.row][target.col].unit = null;
+                targetElement.remove();
+                units = units.filter(u => u.id !== target.id);
+                log(`${target.name} has been defeated!`);
+                
+                checkWinCondition();
+            }
+        }
+
+        function useSpecialAbility() {
+            if (!selectedUnit) return;
+            
+            switch (selectedUnit.special) {
+                case 'Sky Glide':
+                    log(`${selectedUnit.name} uses Sky Glide - ignores terrain penalties!`);
+                    break;
+                case 'Perch Shot':
+                    if (gameBoard[selectedUnit.row][selectedUnit.col].terrain === 'forest') {
+                        selectedUnit.attackRange += 1;
+                        log(`${selectedUnit.name} uses Perch Shot - +1 range in forest!`);
+                    }
+                    break;
+                case 'Wool Shield':
+                    selectedUnit.defense += 2;
+                    log(`${selectedUnit.name} uses Wool Shield - +2 defense until next turn!`);
+                    break;
+                // Add other special abilities as needed
+            }
+            
+            selectedUnit.hasActed = true;
+            updateUnitDisplay(selectedUnit);
+            selectedUnit = null;
+            gameMode = 'select';
+            updateUnitInfo();
+            clearHighlights();
+        }
+
+        function updateUnitDisplay(unit) {
+            const unitElement = gameBoard[unit.row][unit.col].element.querySelector('.unit');
+            if (unit.hasMoved && unit.hasActed) {
+                unitElement.classList.add('moved');
+            }
+        }
+
+        function highlightTile(row, col, className) {
+            gameBoard[row][col].element.classList.add(className);
+        }
+
+        function clearHighlights() {
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    gameBoard[row][col].element.classList.remove('selected', 'movable', 'attackable');
+                }
+            }
+        }
+
+        function updateUnitInfo() {
+            const unitInfo = document.getElementById('unit-info');
+            const portrait = document.getElementById('unit-portrait');
+            const stats = document.getElementById('unit-stats');
+            
+            if (selectedUnit) {
+                portrait.innerHTML = selectedUnit.sprite;
+                portrait.style.fontSize = '40px';
+                portrait.style.display = 'flex';
+                portrait.style.alignItems = 'center';
+                portrait.style.justifyContent = 'center';
+                
+                stats.innerHTML = `
+                    <div>HP: ${selectedUnit.hp}/${selectedUnit.maxHp}</div>
+                    <div>Move: ${selectedUnit.movement}</div>
+                    <div>Attack: ${selectedUnit.attackPower}</div>
+                    <div>Defense: ${selectedUnit.defense}</div>
+                    <div>Range: ${selectedUnit.attackRange}</div>
+                    <div>Special: ${selectedUnit.special}</div>
+                `;
+                
+                unitInfo.querySelector('h3').textContent = `${selectedUnit.name} (${selectedUnit.faction})`;
+            } else {
+                portrait.innerHTML = '';
+                stats.innerHTML = '';
+                unitInfo.querySelector('h3').textContent = 'Select a unit';
+                document.getElementById('unit-actions').innerHTML = '';
+            }
+        }
+
+        function endTurn() {
+            // Reset all units for the current player
+            units.forEach(unit => {
+                if (unit.faction === currentPlayer) {
+                    unit.hasMoved = false;
+                    unit.hasActed = false;
+                    // Reset visual state
+                    const unitElement = gameBoard[unit.row][unit.col].element.querySelector('.unit');
+                    if (unitElement) {
+                        unitElement.classList.remove('moved');
+                    }
+                }
+            });
+            
+            // Switch player
+            currentPlayer = currentPlayer === 'toucan' ? 'alpaca' : 'toucan';
+            if (currentPlayer === 'toucan') {
+                turnCount++;
+            }
+            
+            selectedUnit = null;
+            gameMode = 'select';
+            clearHighlights();
+            updateUI();
+            
+            log(`${currentPlayer === 'toucan' ? 'Toucans' : 'Alpacas'} turn begins!`);
+        }
+
+        function updateUI() {
+            document.getElementById('turn-counter').textContent = turnCount;
+            document.getElementById('current-faction').textContent = currentPlayer === 'toucan' ? 'Toucans' : 'Alpacas';
+            updateUnitInfo();
+        }
+
+        function checkWinCondition() {
+            const toucans = units.filter(u => u.faction === 'toucan');
+            const alpacas = units.filter(u => u.faction === 'alpaca');
+            
+            if (toucans.length === 0) {
+                showModal('Victory!', 'Alpacas have won the Great Fruit War!');
+            } else if (alpacas.length === 0) {
+                showModal('Victory!', 'Toucans have claimed the mango groves!');
+            }
+        }
+
+        function showModal(title, message) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h2>${title}</h2>
+                    <p>${message}</p>
+                    <button onclick="location.reload()">Play Again</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function log(message) {
+            const gameLog = document.getElementById('game-log');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.textContent = `Turn ${turnCount}: ${message}`;
+            gameLog.appendChild(logEntry);
+            gameLog.scrollTop = gameLog.scrollHeight;
+        }
+
+        // Initialize the game when page loads
+        window.onload = initGame;
+    </script>
+</body>
+</html>
